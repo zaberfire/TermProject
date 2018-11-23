@@ -28,6 +28,9 @@ class Asteroid(object):
         
         PILimg = self.image[0]
         width = height = self.r * 5
+        factor = (self.level*1.) / Asteroid.maxSize
+        
+        width = height = int(width * factor)
         
         PILimg = baseImg = PILimg.resize((width, height), Image.ANTIALIAS)
         
@@ -60,6 +63,14 @@ class Asteroid(object):
         self.x += vx
         self.y += vy
     
+    def breakApart(self):
+        if self.level <= Asteroid.minSize:
+            return []
+        else:
+            ast1 = Asteroid(self.x, self.y, self.level - 1)
+            ast2 = Asteroid(self.x, self.y, self.level - 1)
+            return [ast1, ast2]
+            
     def draw(self, canvas, data):
         x = self.x - data.scrollX
         y = self.y - data.scrollY

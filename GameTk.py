@@ -23,6 +23,7 @@ def init(data):
     Asteroid.init()
     Ship.init()
     data.asteroids = []
+    data.bullets = []
     data.margin = 51
     
     for i in range(5):
@@ -73,6 +74,10 @@ def keyPressed(event, data):
 def timerFired(data):
     data.timerCalled += 1
     updateLeapMotionData(data)
+    
+    # for point in data.frame.pointables:
+    #     print(point)
+    # print("---------")
     
     app_width = data.width
     app_height = data.height
@@ -132,6 +137,8 @@ def titleTimerFired(data):
     data.astimage2 = [PILimg, baseImg, ImageTk.PhotoImage(PILimg)]
 
 def titleRedrawAll(canvas, data):
+    data.ship.rotateShip(3.14/2)
+    canvas.create_image(data.width/3., data.height/3., image = data.ship.image[2])
     
     canvas.create_image(data.width/2.,data.height/2., image = data.astimage2[2])
     canvas.create_text(data.width/2, 0, text = "Title Screen", anchor = N, \
@@ -140,14 +147,9 @@ def titleRedrawAll(canvas, data):
 #### play screen events
 
 def playKeyPressed(event, data):
-    if ((event.keysym.lower() == "a") or (event.keysym == "Left")):
-        movePlayer(-data.scrollSpeedX, 0, data)
-    elif ((event.keysym.lower() == "d") or (event.keysym == "Right")):
-        movePlayer(data.scrollSpeedX, 0, data)
-    elif ((event.keysym.lower() == "w") or (event.keysym == "Up")):
-        movePlayer(0, -data.scrollSpeedY, data)
-    elif ((event.keysym.lower() == "s") or (event.keysym == "Down")):
-        movePlayer(0, data.scrollSpeedY, data)
+    bullet = data.ship.makeBullet(data)
+    print(bullet)
+    data.bullets.append(bullet)
 
 def movePlayer(dx, dy, data):
     pX, pY = data.ship.x, data.ship.y
@@ -176,9 +178,26 @@ def playTimerFired(data):
     for ast in data.asteroids:
         ast.update()
     
+    for bullet in data.bullets:
+        bullet.update()
+    
+    for ast in data.asteroids:
+        x0, y0 = ast.x, ast.y
+        r1 = ast.r * 5./2.
+        for bullet in data.bullets:
+            x1, y1 = bullet.x, bullet.y
+            r = r1 + 10
+            dis = math.sqrt((y1-y0)**2 + (x1-x0)**2)
+            if dis <= r:
+                data.bullets.remove(bullet)
+                
+                data.asteroids.extend(ast.breakApart())
+                data.asteroids.remove(ast)
+            
+    
         
     x0,y0 = data.cursor
-    x1,y1 = data.ship.x,data.ship.y
+    x1,y1 = data.width/2., data.height/2.
         
     baseVector = (1,0)
     directionVector = (x0 - x1, y0 - y1)
@@ -198,6 +217,7 @@ def playTimerFired(data):
         angle *= -1
     
     data.ship.rotateShip(angle)
+    data.ship.angle = angle
     
     a,b = directionVector
     if abs(a) > 7 or abs(b > 7):
@@ -206,6 +226,10 @@ def playTimerFired(data):
 def playRedrawAll(canvas, data):
     for ast in data.asteroids:
         ast.draw(canvas, data)
+    
+    for bullet in data.bullets:
+        bullet.draw(canvas,data)
+        
     data.ship.draw(canvas, data)
     canvas.create_text(data.width/2, 0, text = "Play Screen", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
