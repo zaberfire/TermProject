@@ -49,8 +49,13 @@ def init(data):
     data.cursor = (-50,-50)
     data.cursorImage = PhotoImage(file = "images/curs2v1.gif")
     #ImageTk.PhotoImage(cursPIL)
-
     data.controller = Leap.Controller()
+    
+    data.controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
+    data.controller.config.set("Gesture.Swip.MinLength", 100.0)
+    data.controller.config.set("Gesture.Swip.MinVelocity", 777)
+    data.controller.config.save()
+    
     data.frame = data.controller.frame()
     data.fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']
     data.boneNames = ['Metacarpal', 'Proximal', 'Intermediate', 'Distal']
@@ -192,9 +197,10 @@ def playTimerFired(data):
                 data.bullets.remove(bullet)
                 
                 data.asteroids.extend(ast.breakApart())
-                data.asteroids.remove(ast)
-            
-    
+                try:
+                    data.asteroids.remove(ast)
+                except:
+                    pass
         
     x0,y0 = data.cursor
     x1,y1 = data.width/2., data.height/2.
@@ -222,6 +228,31 @@ def playTimerFired(data):
     a,b = directionVector
     if abs(a) > 7 or abs(b > 7):
         movePlayer(dx1, dy1, data)
+    
+    
+    # fire bullet
+    p1 = data.frame.pointables[0].tip_position
+    p2 = data.frame.pointables[1].tip_position
+    p3 = data.frame.pointables[2].tip_position
+    p4 = data.frame.pointables[3].tip_position
+    p5 = data.frame.pointables[4].tip_position
+    disX = p5.x - p1.x
+    
+    if abs(disX) < 50:
+        b = data.ship.makeBullet(data)
+        data.bullets.append(b)
+    
+    # print(p1.tip_position, p2.tip_position, p3.tip_position, p4.tip_position, p5.tip_position)
+    # print(p1.x*p2.x*p3.x*p4.x*p5.x, p1.x**5)
+    # 
+    # for gesture in data.frame.gestures():
+    #     if gesture.type is Leap.Gesture.TYPE_SWIPE:
+    #         swipe = Leap.SwipeGesture(gesture)
+    #         swipper = swipe.pointable
+    #         data.bullets.append(data.ship.makeBullet(data))
+    #         print(swipper)
+    #         break
+    
 
 def playRedrawAll(canvas, data):
     for ast in data.asteroids:
