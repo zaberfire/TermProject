@@ -2,6 +2,7 @@ import math
 import random
 from Asteroid import Asteroid
 from Ship import Ship
+from PowerUp import PowerUp
 from Tkinter import *
 from PIL import Image
 from PIL import ImageTk
@@ -21,6 +22,7 @@ def init(data):
     data.scrollMarginY = data.height/2.
     
     Asteroid.init()
+    PowerUp.init()
     Ship.init()
     data.asteroids = []
     data.bullets = []
@@ -62,9 +64,23 @@ def init(data):
     
     # Ship
     data.ship = Ship(data.width/2., data.height/2.)
+    data.reload = data.ship.fireRate
+    # boosts
+    data.boostDuration = 500  # base level is 5 seconds
+    data.boosts = []
+    data.boosted = []
+    data.boosts.append(PowerUp(0,0,"speed", data.boostDuration, 15))
+    
     
 def mousePressed(event, data):
-    pass
+    if data.mode == "title":
+        titleMousePressed(event, data)
+    elif data.mode == "shop":
+        shopMousePressed(event, data)
+    elif data.mode == "play":
+        playMousePressed(event, data)
+    elif data.mode == "help":
+        helpMousePressed(event, data)
 
 def keyPressed(event, data):
     if data.mode == "title":
@@ -128,6 +144,9 @@ def redrawAll(canvas, data):
 
 #### title screen events
 
+def titleMousePressed(event, data):
+    pass
+    
 def titleKeyPressed(event, data):
     if event.keysym.lower() == "p":
         data.mode = "play"
@@ -151,6 +170,9 @@ def titleRedrawAll(canvas, data):
 
 #### play screen events
 
+def playMousePressed(event, data):
+    data.mode = "shop"
+    
 def playKeyPressed(event, data):
     bullet = data.ship.makeBullet(data)
     print(bullet)
@@ -160,6 +182,12 @@ def movePlayer(dx, dy, data):
     pX, pY = data.ship.x, data.ship.y
     pX += dx
     pY += dy
+    
+    if ((pX + 50 > data.fieldSizeW) or \
+       (pX - 50 < 0) or \
+       (pY + 50 > data.fieldSizeH) or \
+       (pY - 50 < 0)):
+           return
     
     data.ship.x, data.ship.y = pX, pY
     # scroll to make map visible as needed
@@ -201,6 +229,17 @@ def playTimerFired(data):
                     data.asteroids.remove(ast)
                 except:
                     pass
+    
+    for boost in data.boosted:
+        if boost.type == "speed":
+            data.ship.speedBoost = boost.val
+            boost.counter += 1
+            if boost.counter >= boost.duration:
+                data.ship.speedBoost = 0
+                try:
+                    data.boosted.remove(boost)
+                except:
+                    pass
         
     x0,y0 = data.cursor
     x1,y1 = data.width/2., data.height/2.
@@ -212,9 +251,8 @@ def playTimerFired(data):
         
     angle = math.acos((1 * directionVector[0])/(1.*length))
     
-    
-    dx1 = data.ship.speed*math.cos(angle)
-    dy1 = data.ship.speed*math.sin(angle)
+    dx1 = (data.ship.speed+data.ship.speedBoost)*math.cos(angle)
+    dy1 = (data.ship.speed+data.ship.speedBoost)*math.sin(angle)
         
     if y1 > y0:
         dy1 *= -1
@@ -229,44 +267,77 @@ def playTimerFired(data):
     if abs(a) > 7 or abs(b > 7):
         movePlayer(dx1, dy1, data)
     
+    x0,y0 = data.width/2.,data.height/2.
+    for boost in data.boosts:
+        x1,y1 = boost.x-data.scrollX,boost.y-data.scrollY
+        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + 25:
+            data.boosted.append(boost)
+            try:
+                data.boosts.remove(boost)
+            except:
+                pass
+    
+    for asteroid in data.asteroids:
+        x1, y1 = asteroid.x-data.scrollX, asteroid.y-data.scrollY
+        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + asteroid.r*5./2:
+            
+            if data.ship.shield > 0:
+                data.ship.shield -= 10
+            else:
+                data.ship.health -= 10
+                
+            data.asteroids.extend(ast.breakApart())
+            try:
+                data.asteroids.remove(ast)
+            except:
+                pass
+            
+        
     
     # fire bullet
     p1 = data.frame.pointables[0].tip_position
-    p2 = data.frame.pointables[1].tip_position
-    p3 = data.frame.pointables[2].tip_position
-    p4 = data.frame.pointables[3].tip_position
+    # p2 = data.frame.pointables[1].tip_position
+    # p3 = data.frame.pointables[2].tip_position
+    # p4 = data.frame.pointables[3].tip_position
     p5 = data.frame.pointables[4].tip_position
     disX = p5.x - p1.x
     
-    if abs(disX) < 50:
-        b = data.ship.makeBullet(data)
-        data.bullets.append(b)
+    if data.reload < data.ship.fireRate:
+        data.reload += 1
     
-    # print(p1.tip_position, p2.tip_position, p3.tip_position, p4.tip_position, p5.tip_position)
-    # print(p1.x*p2.x*p3.x*p4.x*p5.x, p1.x**5)
-    # 
-    # for gesture in data.frame.gestures():
-    #     if gesture.type is Leap.Gesture.TYPE_SWIPE:
-    #         swipe = Leap.SwipeGesture(gesture)
-    #         swipper = swipe.pointable
-    #         data.bullets.append(data.ship.makeBullet(data))
-    #         print(swipper)
-    #         break
-    
+    if abs(disX) < 25:
+        if data.reload == data.ship.fireRate:
+            b = data.ship.makeBullet(data)
+            data.bullets.append(b)
+            data.reload = 0
 
 def playRedrawAll(canvas, data):
+    
+    canvas.create_rectangle(0 - data.scrollX, 0 - data.scrollY,
+                            data.fieldSizeW - data.scrollX,
+                            data.fieldSizeH - data.scrollY, width = 20)
     for ast in data.asteroids:
         ast.draw(canvas, data)
     
     for bullet in data.bullets:
-        bullet.draw(canvas,data)
+        bullet.draw(canvas, data)
+    
+    for boost in data.boosts:
+        boost.draw(canvas, data)
         
     data.ship.draw(canvas, data)
-    canvas.create_text(data.width/2, 0, text = "Play Screen", anchor = N, \
+    
+    canvas.create_line(10,10,10+data.ship.health, 10,fill = "red", width = 10)
+    canvas.create_line(10,30,10+data.ship.shield, 30,fill = "blue", width = 10)
+     
+    canvas.create_text(data.width/2, 0, text = "DEMO", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
 
 #### help screen events
 
+def helpMousePressed(event, data):
+    pass
+    
 def helpKeyPressed(event, data):
     if event.keysym.lower() == "b":
         data.mode = "title"
@@ -280,6 +351,9 @@ def helpRedrawAll(canvas, data):
 
 #### shop screen events
 
+def shopMousePressed(event, data):
+    data.mode = "play"
+    
 def shopKeyPressed(event, data):
     pass
     
