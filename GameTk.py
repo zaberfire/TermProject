@@ -65,10 +65,13 @@ def init(data):
     # Ship
     data.ship = Ship(data.width/2., data.height/2.)
     data.reload = data.ship.fireRate
+    data.invincibilityTimer = data.ship.invincibilityTimer
+    
     # boosts
     data.boostDuration = 500  # base level is 5 seconds
     data.boosts = []
     data.boosted = []
+    data.boostTypes = ["speed"]
     data.boosts.append(PowerUp(0,0,"speed", data.boostDuration, 15))
     
     
@@ -205,8 +208,14 @@ def playTimerFired(data):
         x = random.randint(data.margin, data.fieldSizeW-data.margin)
         y = random.randint(data.margin, data.fieldSizeH-data.margin)
         ast = Asteroid(x,y)
-        print(ast)
         data.asteroids.append(ast)
+        
+        x = random.randint(data.margin, data.fieldSizeW-data.margin)
+        y = random.randint(data.margin, data.fieldSizeH-data.margin)
+        type = random.choice(data.boostTypes)
+        boostVal = random.randint(5,20)
+        data.boosts.append(PowerUp(x,y,type, data.boostDuration, boostVal))
+        
         
     for ast in data.asteroids:
         ast.update()
@@ -279,8 +288,10 @@ def playTimerFired(data):
     
     for asteroid in data.asteroids:
         x1, y1 = asteroid.x-data.scrollX, asteroid.y-data.scrollY
-        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + asteroid.r*5./2:
-            
+        
+        if ((math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + asteroid.r*5./2) and \
+           (data.invincibilityTimer == data.ship.invincibilityTimer)):
+           
             if data.ship.shield > 0:
                 data.ship.shield -= 10
             else:
@@ -291,7 +302,9 @@ def playTimerFired(data):
                 data.asteroids.remove(ast)
             except:
                 pass
-            
+    
+    if data.ship.health <= 0:
+        data.ship.health = 0
         
     
     # fire bullet
@@ -304,6 +317,9 @@ def playTimerFired(data):
     
     if data.reload < data.ship.fireRate:
         data.reload += 1
+    
+    if data.invincibilityTimer < data.ship.invincibilityTimer:
+        data.invincibilitytimer += 1
     
     if abs(disX) < 25:
         if data.reload == data.ship.fireRate:

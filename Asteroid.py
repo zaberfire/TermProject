@@ -20,7 +20,7 @@ class Asteroid(object):
         
         self.x = x
         self.y = y
-        self.r = self.power = random.randint(5,10*level)
+        self.r = self.power = 7*self.level
         
         if self.r > 50: self.r = 50
             

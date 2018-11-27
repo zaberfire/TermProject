@@ -23,13 +23,16 @@ class Ship(object):
         self.speed = 3
         self.angle = 0
         
-        self.fireRate = 150
+        self.fireRate = 70
+        self.invincibilityTimer = 30
         self.speedBoost = 0
+        self.bulletSpeedBoost = 0
         
         self.health = 100
         self.shield = 100
         self.hpregen = self.health/1000.
         self.shieldregen = self.shield/100.
+        self.bulletSpeed = 6
         
     def levelUP(self):
         self.speed += 1
@@ -44,7 +47,8 @@ class Ship(object):
         angle = self.angle
         disX = 50*math.cos(angle)
         disY = 50*math.sin(angle)
-        return Bullet(self.x+disX, self.y-disY, angle, 6, data.level)
+        speed = self.bulletSpeed + self.bulletSpeedBoost
+        return Bullet(self.x+disX, self.y-disY, angle, speed, data.level)
     
     def draw(self, canvas, data):
         x,y = data.width/2., data.height/2.
