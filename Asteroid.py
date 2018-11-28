@@ -30,7 +30,7 @@ class Asteroid(object):
         width = height = self.r * 5
         factor = (self.level*1.) / Asteroid.maxSize
         
-        width = height = int(width * factor)
+        width = height = self.r = int(width * factor)
         
         PILimg = baseImg = PILimg.resize((width, height), Image.ANTIALIAS)
         
@@ -51,7 +51,8 @@ class Asteroid(object):
         vx, vy = self.velocity
         return "Asteroid at (%d, %d) going (%d, %d)" % (self.x, self.y, vx, vy)
     
-    def update(self):
+    def update(self, data):
+        # rotate asteroid
         self.angle += self.angleSpeed
         PILimg = self.image[0]
         baseImg = self.image[1]
@@ -62,6 +63,14 @@ class Asteroid(object):
         
         self.x += vx
         self.y += vy
+        
+        if ((self.x + self.r > data.fieldSizeW) or \
+            (self.x - self.r < 0)):
+                self.velocity = (-1 * vx, vy)
+        
+        if ((self.y + self.r > data.fieldSizeH) or \
+            (self.y - self.r < 0)):
+                self.velocity = (vx, -1 * vy)
     
     def breakApart(self):
         if self.level <= Asteroid.minSize:

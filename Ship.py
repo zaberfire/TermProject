@@ -52,6 +52,8 @@ class Ship(object):
     
     def draw(self, canvas, data):
         x,y = data.width/2., data.height/2.
+        
+        x,y = self.x - data.scrollX, self.y - data.scrollY
         canvas.create_image(x,y,image = self.image[2])
         
         
