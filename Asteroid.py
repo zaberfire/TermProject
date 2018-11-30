@@ -27,13 +27,13 @@ class Asteroid(object):
         self.image = [Asteroid.image, ImageTk.PhotoImage(Asteroid.image)]
         
         PILimg = self.image[0]
-        width = height = self.r * 5
+        width = height = self.r * 3
         factor = (self.level*1.) / Asteroid.maxSize
         
-        width = height = self.r = int(width * factor)
+        width = height = int(width * factor)
         
         PILimg = baseImg = PILimg.resize((width, height), Image.ANTIALIAS)
-        
+        self.r = width/2.
         self.image = [PILimg, baseImg, ImageTk.PhotoImage(PILimg)]
         
         self.angle = 0

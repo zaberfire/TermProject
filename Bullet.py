@@ -24,7 +24,7 @@ class Bullet(object):
         self.y += vy
         
         dis = math.sqrt(vy**2 + vx**2)
-        self.distance += self.distance
+        self.distance += dis
     
     def draw(self, canvas, data):
         x = self.x - data.scrollX

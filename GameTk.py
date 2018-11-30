@@ -25,9 +25,11 @@ def init(data):
     Asteroid.init()
     PowerUp.init()
     Ship.init()
+    EnemyShip.init()
     
     data.asteroids = []
     data.bullets = []
+    data.enemyBullets = []
     data.margin = 51
     
     for i in range(5):
@@ -54,10 +56,6 @@ def init(data):
     data.cursorImage = PhotoImage(file = "images/curs2v1.gif")
     data.controller = Leap.Controller()
     
-    # data.controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
-    # data.controller.config.set("Gesture.Swip.MinLength", 100.0)
-    # data.controller.config.set("Gesture.Swip.MinVelocity", 777)
-    # data.controller.config.save()
     
     data.frame = data.controller.frame()
     data.fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']
@@ -68,16 +66,16 @@ def init(data):
     data.reload = data.ship.fireRate
     data.invincibilityTimer = data.ship.invincibilityTimer
     
+    data.boss = False
     
-    
-    data.enemy = EnemyShip(0,0)
-    data.enemyReload = data.enemy.fireRate
     # boosts
     data.boostDuration = 500  # base level is 5 seconds
     data.boosts = []
     data.boosted = []
     data.boostTypes = ["speed", "bulletspeed"]
     data.boosts.append(PowerUp(0,0,"speed", data.boostDuration, 15))
+    
+    data.money = 0
     
     
 def mousePressed(event, data):
@@ -211,7 +209,8 @@ def movePlayer(dx, dy, data):
     data.ship.x, data.ship.y = pX, pY
     
 def playTimerFired(data):
-    if data.timerCalled % int(100 * (4./5)**data.level) == 0:
+    if ((data.timerCalled % int(100 * (4./5)**data.level) == 0) and \
+        (len(data.asteroids) <= 15)):
         x = random.randint(data.margin, data.fieldSizeW-data.margin)
         y = random.randint(data.margin, data.fieldSizeH-data.margin)
         ast = Asteroid(x,y)
@@ -222,6 +221,11 @@ def playTimerFired(data):
         type = random.choice(data.boostTypes)
         boostVal = random.randint(5,20)
         data.boosts.append(PowerUp(x,y,type, data.boostDuration, boostVal))
+    
+    if data.timerCalled % 1000 == 0:
+        data.boss = True
+        data.enemy = EnemyShip(data.width/2., 100, data.level)
+        data.enemyReload = data.enemy.fireRate
         
         
     for ast in data.asteroids:
@@ -229,18 +233,20 @@ def playTimerFired(data):
     
     for bullet in data.bullets:
         bullet.update()
+        if bullet.distance >= bullet.range:
+            data.bullets.remove(bullet)
     
     for ast in data.asteroids:
         x0, y0 = ast.x, ast.y
-        r1 = ast.r * 5./2.
+        r1 = ast.r
         for bullet in data.bullets:
             x1, y1 = bullet.x, bullet.y
             r = r1 + 10
             dis = math.sqrt((y1-y0)**2 + (x1-x0)**2)
             if dis <= r:
                 data.bullets.remove(bullet)
-                
                 data.asteroids.extend(ast.breakApart())
+                
                 try:
                     data.asteroids.remove(ast)
                 except:
@@ -256,6 +262,7 @@ def playTimerFired(data):
                     data.boosted.remove(boost)
                 except:
                     pass
+                    
         elif boost.type == "bulletspeed":
             data.ship.bulletSpeedBoost = boost.val
             boost.counter += 1
@@ -293,12 +300,10 @@ def playTimerFired(data):
     if abs(a) > 7 or abs(b > 7):
         movePlayer(dx1, dy1, data)
     
-    data.enemy.update(data)
     
-    
-    x0,y0 = data.width/2.,data.height/2.
+    x0,y0 = data.ship.x, data.ship.y
     for boost in data.boosts:
-        x1,y1 = boost.x-data.scrollX,boost.y-data.scrollY
+        x1,y1 = boost.x, boost.y
         if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + 25:
             data.boosted.append(boost)
             try:
@@ -307,57 +312,74 @@ def playTimerFired(data):
                 pass
     
     for asteroid in data.asteroids:
-        x1, y1 = asteroid.x-data.scrollX, asteroid.y-data.scrollY
+        x1, y1 = asteroid.x, asteroid.y
         
-        if ((math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + asteroid.r*5./2) and \
+        if ((math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + asteroid.r) and \
            (data.invincibilityTimer == data.ship.invincibilityTimer)):
             data.invincibilityTimer = 0
-            print("bam")
+            
             if data.ship.shield > 0:
                 data.ship.shield -= 10
             else:
                 data.ship.health -= 10
             
             data.asteroids.extend(asteroid.breakApart())
+            print("break ship")
             try:
                 data.asteroids.remove(ast)
             except:
                 pass
     
     if data.ship.health <= 0:
-        data.ship.health = 0
+        data.mode = "end"
         
     
     # fire bullet
     p1 = data.frame.pointables[0].tip_position
-    # p2 = data.frame.pointables[1].tip_position
-    # p3 = data.frame.pointables[2].tip_position
-    # p4 = data.frame.pointables[3].tip_position
     p5 = data.frame.pointables[4].tip_position
     disX = p5.x - p1.x
     
     if data.reload < data.ship.fireRate:
         data.reload += 1
     
-    if data.enemyReload < data.enemy.fireRate:
-        data.enemyReload += 1
     
     if data.invincibilityTimer < data.ship.invincibilityTimer:
         data.invincibilityTimer += 1
-        print(data.invincibilityTimer)
     
     if abs(disX) < 25:
         if data.reload == data.ship.fireRate:
             b = data.ship.makeBullet(data)
             data.bullets.append(b)
             data.reload = 0
-    
-    x0,y0 = data.ship.x, data.ship.y
-    x1,y1 = data.enemy.x, data.enemy.y
-    if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= data.enemy.firingDis:
-        if data.enemyReload == data.enemy.fireRate:
-            data.bullets.append(data.enemy.makeBullet(data))
-            data.enemyReload = 0
+            
+    # boss
+    if data.boss:
+        data.enemy.update(data)
+        for bullet in data.enemyBullets:
+            bullet.update()
+            x, y = bullet.x, bullet.y
+        
+        if data.enemyReload < data.enemy.fireRate:
+            data.enemyReload += 1
+        x0,y0 = data.ship.x, data.ship.y
+        x1,y1 = data.enemy.x, data.enemy.y
+        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= data.enemy.firingDis:
+            if data.enemyReload == data.enemy.fireRate:
+                data.enemy.goToThing(data, data.ship.x, data.ship.y)
+                data.enemyBullets.append(data.enemy.makeBullet(data))
+                data.enemyReload = 0
+        
+        x0,y0 = data.enemy.x, data.enemy.y
+        for bullet in data.bullets:
+            x1,y1 = bullet.x, bullet.y
+            if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 10 + 50:
+                data.bullets.remove(bullet)
+                data.enemy.health -= 10
+        if data.enemy.health <= 0:
+            data.boss = False
+            data.money += 100*data.level
+            data.level += 1
+            
 
 def playRedrawAll(canvas, data):
     
@@ -370,11 +392,28 @@ def playRedrawAll(canvas, data):
     for bullet in data.bullets:
         bullet.draw(canvas, data)
     
+    
     for boost in data.boosts:
         boost.draw(canvas, data)
         
     data.ship.draw(canvas, data)
-    data.enemy.draw(canvas, data)
+    
+    if data.boss:
+        for bullet in data.enemyBullets:
+            bullet.draw(canvas, data)
+        data.enemy.draw(canvas, data)
+        
+        x0,y0 = data.width/2., data.height - 30
+        x1, y1 = x0 + data.enemy.health, y0
+        canvas.create_line(x0,y0,x1,y1,fill = "red", width = 15)
+        x1,y1 = data.width/2., data.height - 30
+        x0, y0 = x1 - data.enemy.health, y1
+        canvas.create_line(x0,y0,x1,y1,fill = "red", width = 15)
+        name = data.enemy.name
+        canvas.create_text(data.width/2., data.height - 50, text = name, anchor = S, \
+                            font = ("Arial bold", 66), fill = "white")
+        
+        
     
     canvas.create_line(10,10,10+data.ship.health, 10,fill = "red", width = 10)
     canvas.create_line(10,30,10+data.ship.shield, 30,fill = "blue", width = 10)

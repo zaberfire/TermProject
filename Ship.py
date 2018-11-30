@@ -27,6 +27,7 @@ class Ship(object):
         self.invincibilityTimer = 30
         self.speedBoost = 0
         self.bulletSpeedBoost = 0
+        self.range = 400
         
         self.health = 100
         self.shield = 100
@@ -48,10 +49,10 @@ class Ship(object):
         disX = 50*math.cos(angle)
         disY = 50*math.sin(angle)
         speed = self.bulletSpeed + self.bulletSpeedBoost
-        return Bullet(self.x+disX, self.y-disY, angle, speed, data.level)
+        range = self.range
+        return Bullet(self.x+disX, self.y-disY, angle, speed, range)
     
     def draw(self, canvas, data):
-        x,y = data.width/2., data.height/2.
         
         x,y = self.x - data.scrollX, self.y - data.scrollY
         canvas.create_image(x,y,image = self.image[2])
