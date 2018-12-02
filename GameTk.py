@@ -11,32 +11,24 @@ import Leap
 from Leap import CircleGesture, KeyTapGesture, ScreenTapGesture, SwipeGesture
 
 def init(data):
-    data.timerCalled = 0
-    data.mode = "title"
-    data.level = 1
-    
-    data.fieldSizeW = 3 * data.width
-    data.fieldSizeH = 3 * data.height
-    data.scrollX = data.width
-    data.scrollY = data.height
-    data.scrollMarginX = data.width/2.
-    data.scrollMarginY = data.height/2.
-    
     Asteroid.init()
     PowerUp.init()
     Ship.init()
     EnemyShip.init()
     
+    data.mode = "title"
+    
+    data.fieldSizeW = 3 * data.width
+    data.fieldSizeH = 3 * data.height
+    data.scrollMarginX = data.width/2.
+    data.scrollMarginY = data.height/2.
+    
     data.asteroids = []
     data.bullets = []
-    data.enemyBullets = []
+    
     data.margin = 51
     
-    for i in range(5):
-        x = random.randint(data.margin, data.fieldSizeW-data.margin)
-        y = random.randint(data.margin, data.fieldSizeH-data.margin)
-        data.asteroids.append(Asteroid(x,y,data.level))
-    
+    initializeGame(data, data.mode)
     data.paused = False
     
     
@@ -52,7 +44,7 @@ def init(data):
     
     
     # Leap Motion
-    data.cursor = (-50,-50)
+
     data.cursorImage = PhotoImage(file = "images/curs2v1.gif")
     data.controller = Leap.Controller()
     
@@ -60,6 +52,24 @@ def init(data):
     data.frame = data.controller.frame()
     data.fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']
     data.boneNames = ['Metacarpal', 'Proximal', 'Intermediate', 'Distal']
+    
+    data.players = dict()
+
+def initializeGame(data, screen):
+    
+    data.level = 1
+    
+    data.timerCalled = 0
+    
+    data.scrollX = data.width
+    data.scrollY = data.height
+    
+    for i in range(5):
+        x = random.randint(data.margin, data.fieldSizeW-data.margin)
+        y = random.randint(data.margin, data.fieldSizeH-data.margin)
+        data.asteroids.append(Asteroid(x,y,data.level))
+    
+    data.cursor = (-50,-50)
     
     # Ship
     data.ship = Ship(data.width/2., data.height/2.)
@@ -77,6 +87,7 @@ def init(data):
     
     data.money = 0
     
+    data.mode = screen
     
 def mousePressed(event, data):
     if data.mode == "title":
@@ -87,6 +98,8 @@ def mousePressed(event, data):
         playMousePressed(event, data)
     elif data.mode == "help":
         helpMousePressed(event, data)
+    elif data.mode == "end":
+        endMousePressed(event, data)
 
 def keyPressed(event, data):
     if data.mode == "title":
@@ -97,14 +110,12 @@ def keyPressed(event, data):
         playKeyPressed(event, data)
     elif data.mode == "help":
         helpKeyPressed(event, data)
+    elif data.mode == "end":
+        endKeyPressed(event, data)
         
 def timerFired(data):
     data.timerCalled += 1
     updateLeapMotionData(data)
-    
-    # for point in data.frame.pointables:
-    #     print(point)
-    # print("---------")
     
     app_width = data.width
     app_height = data.height
@@ -129,6 +140,8 @@ def timerFired(data):
         playTimerFired(data)
     elif data.mode == "help":
         helpTimerFired(data)
+    elif data.mode == "end":
+        endTimerFired(data)
 
 def updateLeapMotionData(data):
     data.frame = data.controller.frame()
@@ -211,20 +224,25 @@ def movePlayer(dx, dy, data):
 def playTimerFired(data):
     if ((data.timerCalled % int(100 * (4./5)**data.level) == 0) and \
         (len(data.asteroids) <= 15)):
+            
+        # create asteroids
         x = random.randint(data.margin, data.fieldSizeW-data.margin)
         y = random.randint(data.margin, data.fieldSizeH-data.margin)
         ast = Asteroid(x,y)
         data.asteroids.append(ast)
         
+        # create boosts
         x = random.randint(data.margin, data.fieldSizeW-data.margin)
         y = random.randint(data.margin, data.fieldSizeH-data.margin)
         type = random.choice(data.boostTypes)
         boostVal = random.randint(5,20)
         data.boosts.append(PowerUp(x,y,type, data.boostDuration, boostVal))
     
+    # create boss ship
     if data.timerCalled % 1000 == 0:
         data.boss = True
         data.enemy = EnemyShip(data.width/2., 100, data.level)
+        data.enemyBullets = []
         data.enemyReload = data.enemy.fireRate
         
         
@@ -236,6 +254,9 @@ def playTimerFired(data):
         if bullet.distance >= bullet.range:
             data.bullets.remove(bullet)
     
+    data.ship.update()
+    
+    # check collisions between asteroids and bullets
     for ast in data.asteroids:
         x0, y0 = ast.x, ast.y
         r1 = ast.r
@@ -251,7 +272,23 @@ def playTimerFired(data):
                     data.asteroids.remove(ast)
                 except:
                     pass
+                    
+        if data.boss:
+            for bullet in data.enemyBullets:
+                x1, y1 = bullet.x, bullet.y
+                r = r1 + 10
+                dis = math.sqrt((y1-y0)**2 + (x1-x0)**2)
+                if dis <= r:
+                    data.enemyBullets.remove(bullet)
+                    data.asteroids.extend(ast.breakApart())
+                    
+                    try:
+                        data.asteroids.remove(ast)
+                    except:
+                        pass
+                
     
+    # boost timer
     for boost in data.boosted:
         if boost.type == "speed":
             data.ship.speedBoost = boost.val
@@ -268,6 +305,26 @@ def playTimerFired(data):
             boost.counter += 1
             if boost.counter >= boost.duration:
                 data.ship.bulletSpeedBoost = 0
+                try:
+                    data.boosted.remove(boost)
+                except:
+                    pass
+        
+        elif boost.type == "firerate":
+            data.ship.fireRateBoost = boost.val
+            boost.counter += 1
+            if boost.counter >= boost.duration:
+                data.ship.fireRateBoost = 0
+                try:
+                    data.boosted.remove(boost)
+                except:
+                    pass
+        
+        elif boost.type == "dmgboost":
+            data.ship.dmgBoost = boost.val
+            boost.counter += 1
+            if boost.counter >= boost.duration:
+                data.ship.dmgBoost = 0
                 try:
                     data.boosted.remove(boost)
                 except:
@@ -300,7 +357,7 @@ def playTimerFired(data):
     if abs(a) > 7 or abs(b > 7):
         movePlayer(dx1, dy1, data)
     
-    
+    # pick up boost
     x0,y0 = data.ship.x, data.ship.y
     for boost in data.boosts:
         x1,y1 = boost.x, boost.y
@@ -311,6 +368,7 @@ def playTimerFired(data):
             except:
                 pass
     
+    # hit your ship
     for asteroid in data.asteroids:
         x1, y1 = asteroid.x, asteroid.y
         
@@ -318,13 +376,8 @@ def playTimerFired(data):
            (data.invincibilityTimer == data.ship.invincibilityTimer)):
             data.invincibilityTimer = 0
             
-            if data.ship.shield > 0:
-                data.ship.shield -= 10
-            else:
-                data.ship.health -= 10
-            
+            data.ship.hit(10 * data.level)
             data.asteroids.extend(asteroid.breakApart())
-            print("break ship")
             try:
                 data.asteroids.remove(ast)
             except:
@@ -339,9 +392,9 @@ def playTimerFired(data):
     p5 = data.frame.pointables[4].tip_position
     disX = p5.x - p1.x
     
-    if data.reload < data.ship.fireRate:
-        data.reload += 1
     
+    if data.reload < data.ship.fireRate - data.ship.fireRateBoost:
+        data.reload += 1
     
     if data.invincibilityTimer < data.ship.invincibilityTimer:
         data.invincibilityTimer += 1
@@ -374,7 +427,15 @@ def playTimerFired(data):
             x1,y1 = bullet.x, bullet.y
             if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 10 + 50:
                 data.bullets.remove(bullet)
-                data.enemy.health -= 10
+                data.enemy.health -= data.ship.dmg
+        
+        x0, y0 = data.ship.x, data.ship.y
+        for bullet in data.enemyBullets:
+            x1, y1 = bullet.x, bullet.y
+            if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 10 + 50:
+                data.enemyBullets.remove(bullet)
+                data.ship.hit(data.enemy.dmg)
+            
         if data.enemy.health <= 0:
             data.boss = False
             data.money += 100*data.level
@@ -395,8 +456,9 @@ def playRedrawAll(canvas, data):
     
     for boost in data.boosts:
         boost.draw(canvas, data)
-        
-    data.ship.draw(canvas, data)
+    
+    if data.ship.health > 0:
+        data.ship.draw(canvas, data)
     
     if data.boss:
         for bullet in data.enemyBullets:
@@ -418,8 +480,8 @@ def playRedrawAll(canvas, data):
     canvas.create_line(10,10,10+data.ship.health, 10,fill = "red", width = 10)
     canvas.create_line(10,30,10+data.ship.shield, 30,fill = "blue", width = 10)
      
-    canvas.create_text(data.width/2, 0, text = "DEMO", anchor = N, \
-                            font = ("Arial bold", 77), fill = "white")
+    # canvas.create_text(data.width/2, 0, text = "DEMO", anchor = N, \
+    #                         font = ("Arial bold", 77), fill = "white")
 
 #### help screen events
 
@@ -434,7 +496,7 @@ def helpTimerFired(data):
     pass
 
 def helpRedrawAll(canvas, data):
-    canvas.create_text(data.width/2, 0, text = "Help Screen", anchor = N, \
+    canvas.create_text(data.width/2., 0, text = "Help Screen", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
 
 #### shop screen events
@@ -449,8 +511,25 @@ def shopTimerFired(data):
     pass
 
 def shopRedrawAll(canvas, data):
+    # canvas.create_
     pass
 
+#### end screen events
+
+def endMousePressed(event, data):
+    data.mode = "play"
+    
+def endKeyPressed(event, data):
+    pass
+    
+def endTimerFired(data):
+    pass
+
+def endRedrawAll(canvas, data):
+    # canvas.create_text(data.width/2., 50, text = "
+    pass
+    
+    
 #################################################################
 # use the run function as-is
 #################################################################

@@ -35,6 +35,7 @@ class EnemyShip(object):
         
         self.bulletSpeed = 10 * (level/2.)
         
+        self.dmg = 15 * level
         self.fireRate = 20 - (3*level)
 
     def update(self, data):

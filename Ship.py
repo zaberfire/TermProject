@@ -24,19 +24,52 @@ class Ship(object):
         self.angle = 0
         
         self.fireRate = 70
+        self.fireRateBoost = 0
         self.invincibilityTimer = 30
         self.speedBoost = 0
         self.bulletSpeedBoost = 0
-        self.range = 400
+        self.range = 350
         
-        self.health = 100
-        self.shield = 100
-        self.hpregen = self.health/1000.
-        self.shieldregen = self.shield/100.
+        self.basedmg = 20
+        self.dmgBoost = 0
+        self.dmg = self.basedmg + self.dmgBoost
+        
+        self.maxhealth = 100
+        self.health = self.maxhealth
+        self.maxshield = 100
+        self.shield = self.maxshield
+        self.hpregen = self.maxhealth/1000.
+        self.shieldregen = self.maxshield/100.
         self.bulletSpeed = 6
+    
+    def hit(self, dmg):
+        if self.shield - dmg <= 0:
+            self.shield = 0
+            overflow = abs(self.shield - dmg)
+            self.health -= overflow
+        
+        else:
+            self.shield -= dmg
+    
+    def update(self):
+        if ((self.shield < self.maxshield) and (self.health == self.maxhealth)):
+            self.shield += self.shieldregen
+        
+        if self.health < self.maxhealth:
+            self.health += self.hpregen
+        
+        self.dmg = self.basedmg + self.dmgBoost
         
     def levelUP(self):
-        self.speed += 1
+        self.speed += 3
+        self.bulletSpeed += 3
+        self.range += 50
+        self.fireRate -= 2
+        self.maxhealth += 15
+        self.maxshield += 15
+        self.hpregen = self.maxhealth/1000.
+        self.shieldregen = self.maxshield/100.
+        self.basedmg += 7
     
     def rotateShip(self,angle):
         PILimg = self.image[0]
