@@ -11,7 +11,7 @@ class EnemyShip(object):
     def init():
         EnemyShip.image = Image.open("images/enemy.png")
     
-    bosses = ["Type 1", "TesterWrester", "LMAO"]
+    bosses = ["Wraith", "Deathmaster", "LMAO-MKI"]
         
     def __init__(self, x, y, level):
         self.x = x
@@ -27,7 +27,7 @@ class EnemyShip(object):
         self.angle = 0
         
         self.size = 50
-        self.saftyR = 200
+        self.safetyR = 200
         self.firingDis = 350
         
         self.health = 100*level
@@ -39,15 +39,38 @@ class EnemyShip(object):
         self.fireRate = 20 - (3*level)
 
     def update(self, data):
+        if self.name == "Wraith":
+            self.updateWraith(data)
+        elif self.name == "Deathmaster":
+            self.updateDeath(data)
+    
+    def updateDeath(self,data):
         x0,y0 = self.x,self.y
         for ast in data.asteroids:
             x1,y1 = ast.x, ast.y
-            if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.saftyR:
+            if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
+                self.avoidThing(data, x1, y1)
+        
+        # for bullet in data.bullets:
+        #     x1, y1 = bullet.x, bullet.y
+        #     if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
+        #         self.avoidThingLaterally(data, bullet)
+            
+        x1, y1 = data.ship.x, data.ship.y
+        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= self.safetyR:
+            self.avoidThing(data, x1, y1)
+        elif math.sqrt((x1-x0)**2 + (y1-y0)**2) > self.firingDis:
+            self.goToThing(data, x1, y1)
+    
+    def updateWraith(self, data):
+        x0,y0 = self.x,self.y
+        for ast in data.asteroids:
+            x1,y1 = ast.x, ast.y
+            if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
                 self.avoidThing(data, x1, y1)
                 
-                
         x1, y1 = data.ship.x, data.ship.y
-        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= self.saftyR:
+        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= self.safetyR:
             self.avoidThing(data, x1, y1)
         elif math.sqrt((x1-x0)**2 + (y1-y0)**2) > self.firingDis:
             self.goToThing(data, x1, y1)
@@ -59,6 +82,7 @@ class EnemyShip(object):
         disY = 50*math.sin(angle)
         speed = self.bulletSpeed
         return Bullet(self.x+disX, self.y-disY, angle, speed, 1)
+
     
     def avoidThing(self, data, x1, y1):
         x0,y0 = self.x, self.y
@@ -68,11 +92,7 @@ class EnemyShip(object):
         
         angle = math.acos((1 * directionVector[0])/(1.*length))
         self.angle = angle
-        
-        # if length <= self.saftyR:
-        #     angle *= -1
-        # # elif length > self.saftyR and length <= self.firingDis:
-        # #     angle += math.pi/2.
+
         
         dx1 = (self.speed)*math.cos(angle)
         dy1 = (self.speed)*math.sin(angle)

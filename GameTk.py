@@ -4,6 +4,7 @@ from Asteroid import Asteroid
 from Ship import Ship
 from EnemyShip import EnemyShip
 from PowerUp import PowerUp
+from ShopHolo import ShopHolo
 from Tkinter import *
 from PIL import Image
 from PIL import ImageTk
@@ -15,6 +16,7 @@ def init(data):
     PowerUp.init()
     Ship.init()
     EnemyShip.init()
+    ShopHolo.init(data)
     
     data.mode = "title"
     
@@ -23,31 +25,25 @@ def init(data):
     data.scrollMarginX = data.width/2.
     data.scrollMarginY = data.height/2.
     
-    data.asteroids = []
-    data.bullets = []
-    
     data.margin = 51
+    data.boostTypes = ["speed", "bulletspeed", "firerate", "dmgboost"]
     
     initializeGame(data, data.mode)
+    loadImages(data)
+    
     data.paused = False
     
-    
-    pilImg = baseImg = Image.open("images/asteroids2.png")
-    data.astimage2 = [pilImg, baseImg, ImageTk.PhotoImage(pilImg)]
     data.angle = 0
     data.angleSpeed = 10
     
-    data.background = Image.open("images/starryspace.png")
-    data.background = data.background.resize((data.fieldSizeW, data.fieldSizeH), \
-                                                Image.ANTIALIAS)
-    data.background = ImageTk.PhotoImage(data.background)
-    
+    # shop screen holos
+    holo1 = ShopHolo(1)
+    holo2 = ShopHolo(2)
+    holo3 = ShopHolo(3)
+    data.holos = [holo1, holo2, holo3]
     
     # Leap Motion
-
-    data.cursorImage = PhotoImage(file = "images/curs2v1.gif")
     data.controller = Leap.Controller()
-    
     
     data.frame = data.controller.frame()
     data.fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']
@@ -55,6 +51,27 @@ def init(data):
     
     data.players = dict()
 
+def loadImages(data):
+    pilImg = baseImg = Image.open("images/asteroids2.png")
+    data.astimage2 = [pilImg, baseImg, ImageTk.PhotoImage(pilImg)]
+    
+    data.background = Image.open("images/starryspace.png")
+    data.background = data.background.resize((data.fieldSizeW, data.fieldSizeH), \
+                                                Image.ANTIALIAS)
+    data.background = ImageTk.PhotoImage(data.background)
+    
+    # shop screen images
+    data.shopbackground = Image.open("images/shopbackground.png")
+    data.shopbackground = data.shopbackground.resize((data.width, data.height), \
+                                                Image.ANTIALIAS)
+    data.shopbackground = ImageTk.PhotoImage(data.shopbackground)
+    
+    data.cursorImage = PhotoImage(file = "images/curs2v1.gif")
+    
+    data.moneyIcon = Image.open("images/icons/moneyIcon.png")
+    data.moneyIcon = data.moneyIcon.resize((30,30), Image.ANTIALIAS)
+    data.moneyIcon = ImageTk.PhotoImage(data.moneyIcon)
+    
 def initializeGame(data, screen):
     
     data.level = 1
@@ -63,6 +80,9 @@ def initializeGame(data, screen):
     
     data.scrollX = data.width
     data.scrollY = data.height
+    
+    data.asteroids = []
+    data.bullets = []
     
     for i in range(5):
         x = random.randint(data.margin, data.fieldSizeW-data.margin)
@@ -82,10 +102,11 @@ def initializeGame(data, screen):
     data.boostDuration = 500  # base level is 5 seconds
     data.boosts = []
     data.boosted = []
-    data.boostTypes = ["speed", "bulletspeed"]
-    data.boosts.append(PowerUp(0,0,"speed", data.boostDuration, 15))
     
     data.money = 0
+    data.cost = 5
+    data.canBuy = False
+    data.effect = False
     
     data.mode = screen
     
@@ -150,8 +171,6 @@ def redrawAll(canvas, data):
     canvas.create_image(0 - data.scrollX,0 - data.scrollY, anchor = NW, \
                                 image = data.background)
     
-    x,y = data.cursor
-    canvas.create_image(x,y, image = data.cursorImage)
     if data.mode == "title":
         titleRedrawAll(canvas,data)
     elif data.mode == "shop":
@@ -160,6 +179,8 @@ def redrawAll(canvas, data):
         playRedrawAll(canvas,data)
     elif data.mode == "help":
         helpRedrawAll(canvas,data)
+    elif data.mode == "end":
+        endRedrawAll(canvas, data)
 
 #### title screen events
 
@@ -180,12 +201,13 @@ def titleTimerFired(data):
     data.astimage2 = [PILimg, baseImg, ImageTk.PhotoImage(PILimg)]
 
 def titleRedrawAll(canvas, data):
-    data.ship.rotateShip(3.14/2)
-    canvas.create_image(data.width/3., data.height/3., image = data.ship.image[2])
     
     canvas.create_image(data.width/2.,data.height/2., image = data.astimage2[2])
-    canvas.create_text(data.width/2, 0, text = "Title Screen", anchor = N, \
+    canvas.create_text(data.width/2, 0, text = "Handful of Asteroids", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
+    
+    x,y = data.cursor
+    canvas.create_image(x,y, image = data.cursorImage)
 
 #### play screen events
 
@@ -265,6 +287,7 @@ def playTimerFired(data):
             r = r1 + 10
             dis = math.sqrt((y1-y0)**2 + (x1-x0)**2)
             if dis <= r:
+                data.money = data.money + (10*data.level)
                 data.bullets.remove(bullet)
                 data.asteroids.extend(ast.breakApart())
                 
@@ -382,25 +405,21 @@ def playTimerFired(data):
                 data.asteroids.remove(ast)
             except:
                 pass
-    
-    if data.ship.health <= 0:
-        data.mode = "end"
-        
-    
+
     # fire bullet
     p1 = data.frame.pointables[0].tip_position
     p5 = data.frame.pointables[4].tip_position
     disX = p5.x - p1.x
     
     
-    if data.reload < data.ship.fireRate - data.ship.fireRateBoost:
+    if data.reload < data.ship.fireRate:
         data.reload += 1
     
     if data.invincibilityTimer < data.ship.invincibilityTimer:
         data.invincibilityTimer += 1
     
     if abs(disX) < 25:
-        if data.reload == data.ship.fireRate:
+        if data.reload >= data.ship.fireRate - data.ship.fireRateBoost:
             b = data.ship.makeBullet(data)
             data.bullets.append(b)
             data.reload = 0
@@ -422,6 +441,15 @@ def playTimerFired(data):
                 data.enemyBullets.append(data.enemy.makeBullet(data))
                 data.enemyReload = 0
         
+        if data.enemy.name != "Wraith":
+            for asteroid in data.asteroids:
+                x0, y0 = asteroid.x, asteroid.y
+                if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= data.enemy.safetyR*2:
+                    if data.enemyReload == data.enemy.fireRate:
+                        data.enemy.goToThing(data, data.ship.x, data.ship.y)
+                        data.enemyBullets.append(data.enemy.makeBullet(data))
+                        data.enemyReload = 0
+        
         x0,y0 = data.enemy.x, data.enemy.y
         for bullet in data.bullets:
             x1,y1 = bullet.x, bullet.y
@@ -440,6 +468,9 @@ def playTimerFired(data):
             data.boss = False
             data.money += 100*data.level
             data.level += 1
+    
+    if data.ship.health <= 0:
+        data.mode = "end"
             
 
 def playRedrawAll(canvas, data):
@@ -480,8 +511,12 @@ def playRedrawAll(canvas, data):
     canvas.create_line(10,10,10+data.ship.health, 10,fill = "red", width = 10)
     canvas.create_line(10,30,10+data.ship.shield, 30,fill = "blue", width = 10)
      
-    # canvas.create_text(data.width/2, 0, text = "DEMO", anchor = N, \
-    #                         font = ("Arial bold", 77), fill = "white")
+    moneyStart = 10 + data.ship.health
+    canvas.create_image(moneyStart + 20, 20, image = data.moneyIcon)
+    canvas.create_text(moneyStart + 70, 20, text = "%d credits" % data.money, \
+                                    fill = "white")
+    x,y = data.cursor
+    canvas.create_image(x,y, image = data.cursorImage)
 
 #### help screen events
 
@@ -498,36 +533,113 @@ def helpTimerFired(data):
 def helpRedrawAll(canvas, data):
     canvas.create_text(data.width/2., 0, text = "Help Screen", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
+    
+    x,y = data.cursor
+    canvas.create_image(x,y, image = data.cursorImage)
 
 #### shop screen events
 
 def shopMousePressed(event, data):
-    data.mode = "play"
+    x,y = event.x, event.y
+    cx,cy = data.width/2., data.height - 260
+    if ((x > cx - 40) and (x < cx + 40) and \
+       (y < cy + 20) and (y > cy - 20) and data.money >= data.cost):
+           data.money -= data.cost
+           data.cost += random.randint(data.cost, data.cost*data.level)
+           data.ship.maxhealth += 10
+           data.ship.maxshield += 10
+           data.ship.speed += 3
+           data.ship.bulletSpeed += 3
+           data.ship.fireRate -= 3
+           data.ship.basedmg += 5
+           data.ship.range += 25
     
 def shopKeyPressed(event, data):
-    pass
+    data.mode = "play"
     
 def shopTimerFired(data):
-    pass
+    for holo in data.holos:
+        holo.update()
+        
+    if data.money >= data.cost:
+        data.canBuy = True
+    else:
+        data.canBuy = False
+        data.effect = False
+        
+    if data.canBuy:
+        data.effect = not data.effect
+    
 
+def drawBut(canvas, data, eff):
+    color = "gray"
+    if eff == True:
+        color = "blue"
+    
+    x,y = data.width/2., data.height - 260
+    x0,y0 = x-40, y-20
+    x1,y1 = x+40,y+20
+        
+    canvas.create_rectangle(x0,y0,x1,y1, fill = color)
+    canvas.create_text(x,y, text = "Upgrade", fill = "white", font = \
+                            ("Arial", 18))
+    
 def shopRedrawAll(canvas, data):
-    # canvas.create_
-    pass
+    margin = 35
+    canvas.create_image(0,0, anchor = NW, image = data.shopbackground)
+    for holo in data.holos:
+        holo.draw(canvas, data)
+    
+    canvas.create_text(data.width/2., data.height/3., text = "Ship", font = \
+                            ("Arial", 30), fill = "white")
+                            
+    canvas.create_text(data.width/2., data.height/3. + 10+margin, \
+                        text = "Health: %d" % data.ship.maxhealth, font = \
+                            ("Arial", 20), fill = "white")
+                            
+    canvas.create_text(data.width/2., data.height/3. + 10+margin*2, \
+                        text = "Shield: %d" % data.ship.maxshield, font = \
+                            ("Arial", 20), fill = "white")
+    canvas.create_text(data.width/2., data.height/3. + 10+3*margin, \
+                        text = "Speed: %d" % data.ship.speed, font = \
+                            ("Arial", 20), fill = "white")
+    canvas.create_text(data.width/2., data.height/3. + 10+4*margin, \
+                        text = "Bullet speed: %d" % data.ship.bulletSpeed, font = \
+                            ("Arial", 20), fill = "white")
+    fireRate = data.ship.fireRate*10
+    canvas.create_text(data.width/2., data.height/3. + 10+5*margin, \
+                        text = "Fire rate: %d ms" % fireRate, font = \
+                            ("Arial", 20), fill = "white")
+    canvas.create_text(data.width/2., data.height/3. +10+ 6*margin, \
+                        text = "Attack: %d" % data.ship.basedmg, font = \
+                            ("Arial", 20), fill = "white")
+    drawBut(canvas, data, data.effect)
+    
+
+    x,y = data.cursor
+    canvas.create_image(x,y, image = data.cursorImage)
+    
 
 #### end screen events
 
 def endMousePressed(event, data):
-    data.mode = "play"
+    pass
     
 def endKeyPressed(event, data):
-    pass
+    if event.keysym == "p":
+        initializeGame(data, "play")
     
 def endTimerFired(data):
     pass
 
 def endRedrawAll(canvas, data):
-    # canvas.create_text(data.width/2., 50, text = "
-    pass
+    canvas.create_rectangle(0,0, data.width, data.height, fill = "black")
+    canvas.create_text(data.width/2., 0, text = "Game Over", fill = "white", \
+                        anchor = N, font = ("Arial", 100))
+    
+    x,y = data.cursor
+    canvas.create_image(x,y, image = data.cursorImage)
+   
     
     
 #################################################################
