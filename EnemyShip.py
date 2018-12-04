@@ -12,11 +12,18 @@ class EnemyShip(object):
         EnemyShip.image = Image.open("images/enemy.png")
     
     bosses = ["Wraith", "Deathmaster", "LMAO-MKI"]
+    model = 1
         
     def __init__(self, x, y, level):
         self.x = x
         self.y = y
-        self.name = EnemyShip.bosses[level-1]
+        try:
+            self.name = EnemyShip.bosses[level-1]
+        except:
+            self.name = random.choice(EnemyShip.bosses)
+            self.name += " Type " + str(EnemyShip.model)
+            EnemyShip.model += 1
+            
         self.image = [EnemyShip.image, ImageTk.PhotoImage(EnemyShip.image)]
         
         PILimg = self.image[0]
@@ -36,39 +43,15 @@ class EnemyShip(object):
         self.bulletSpeed = 10 * (level/2.)
         
         self.dmg = 15 * level
-        self.fireRate = 20 - (3*level)
+        self.fireRate = 30 - (3*(level-1))
 
     def update(self, data):
-        if self.name == "Wraith":
-            self.updateWraith(data)
-        elif self.name == "Deathmaster":
-            self.updateDeath(data)
-    
-    def updateDeath(self,data):
         x0,y0 = self.x,self.y
         for ast in data.asteroids:
             x1,y1 = ast.x, ast.y
             if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
                 self.avoidThing(data, x1, y1)
-        
-        # for bullet in data.bullets:
-        #     x1, y1 = bullet.x, bullet.y
-        #     if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
-        #         self.avoidThingLaterally(data, bullet)
             
-        x1, y1 = data.ship.x, data.ship.y
-        if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= self.safetyR:
-            self.avoidThing(data, x1, y1)
-        elif math.sqrt((x1-x0)**2 + (y1-y0)**2) > self.firingDis:
-            self.goToThing(data, x1, y1)
-    
-    def updateWraith(self, data):
-        x0,y0 = self.x,self.y
-        for ast in data.asteroids:
-            x1,y1 = ast.x, ast.y
-            if math.sqrt((y1-y0)**2 + (x1-x0)**2) <= self.safetyR:
-                self.avoidThing(data, x1, y1)
-                
         x1, y1 = data.ship.x, data.ship.y
         if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= self.safetyR:
             self.avoidThing(data, x1, y1)

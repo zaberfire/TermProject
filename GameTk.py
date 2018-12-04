@@ -110,6 +110,11 @@ def initializeGame(data, screen):
     
     data.mode = screen
     
+    # help screen stuff
+    data.boomTexts = []
+    data.boomRate = 17
+    data.boom = 17
+    
 def mousePressed(event, data):
     if data.mode == "title":
         titleMousePressed(event, data)
@@ -186,6 +191,9 @@ def redrawAll(canvas, data):
 
 def titleMousePressed(event, data):
     pass
+
+def titleHandPressed(screen,data):
+    data.mode = screen
     
 def titleKeyPressed(event, data):
     if event.keysym.lower() == "p":
@@ -199,12 +207,54 @@ def titleTimerFired(data):
     baseImg = data.astimage2[1]
     PILimg = baseImg.rotate(data.angle)
     data.astimage2 = [PILimg, baseImg, ImageTk.PhotoImage(PILimg)]
+    
+    p1 = data.frame.pointables[0].tip_position
+    p5 = data.frame.pointables[4].tip_position
+    disX = p5.x - p1.x
+    
+    x,y = data.cursor
+    x1, y1 = data.width/2., data.height - 100
+    y2 = y1 - 50
+    if ((x < x1 + 50) and (x > x1 - 50) and \
+        (y > y1 - 20) and (y < y1 + 20)):
+            if abs(disX) <= 25:
+                titleHandPressed("help",data)
+            data.overHelp = True
+            data.overPlay = False
+    elif ((x < x1 + 50) and (x > x1 - 50) and \
+        (y > y2 - 20) and (y < y2 + 20)):
+            if abs(disX) <= 25:
+                titleHandPressed("play",data)
+            data.overPlay = True
+            data.overHelp = False
+    else:
+        data.overPlay = False
+        data.overHelp = False
+    
+
+def createButton(canvas, data,x,y, text, over):
+    color = "cyan"
+    if over:
+        color = "yellow"
+    canvas.create_rectangle(x-50,y-20,x+50,y+20, fill = color)
+    canvas.create_text(x,y, text = text, fill = "black", \
+                        font = ("Arial", 25))
 
 def titleRedrawAll(canvas, data):
     
     canvas.create_image(data.width/2.,data.height/2., image = data.astimage2[2])
-    canvas.create_text(data.width/2, 0, text = "Handful of Asteroids", anchor = N, \
+    canvas.create_text(data.width/2, 50, text = "Handful",  \
                             font = ("Arial bold", 77), fill = "white")
+    canvas.create_text(data.width/2, 125, text = "of", \
+                            font = ("Arial bold", 50), fill = "white")
+    canvas.create_text(data.width/2, 200, text = "Asteroids",  \
+                            font = ("Arial bold", 77), fill = "white")
+    
+    x = data.width/2.
+    y = data.height - 100
+                            
+    createButton(canvas, data, x,y,"Help", data.overHelp)
+    createButton(canvas, data, x, y-50,"Play", data.overPlay)
     
     x,y = data.cursor
     canvas.create_image(x,y, image = data.cursorImage)
@@ -263,7 +313,10 @@ def playTimerFired(data):
     # create boss ship
     if data.timerCalled % 1000 == 0:
         data.boss = True
-        data.enemy = EnemyShip(data.width/2., 100, data.level)
+        mar = data.width/3.
+        x = random.randint(mar, data.width - mar)
+        y = random.randint(mar, data.height - mar)
+        data.enemy = EnemyShip(x,y, data.level)
         data.enemyBullets = []
         data.enemyReload = data.enemy.fireRate
         
@@ -287,7 +340,7 @@ def playTimerFired(data):
             r = r1 + 10
             dis = math.sqrt((y1-y0)**2 + (x1-x0)**2)
             if dis <= r:
-                data.money = data.money + (10*data.level)
+                data.money = data.money + (15*data.level*2)
                 data.bullets.remove(bullet)
                 data.asteroids.extend(ast.breakApart())
                 
@@ -399,7 +452,7 @@ def playTimerFired(data):
            (data.invincibilityTimer == data.ship.invincibilityTimer)):
             data.invincibilityTimer = 0
             
-            data.ship.hit(10 * data.level)
+            data.ship.hit(10 + (data.level-1)*2)
             data.asteroids.extend(asteroid.breakApart())
             try:
                 data.asteroids.remove(ast)
@@ -433,6 +486,8 @@ def playTimerFired(data):
         
         if data.enemyReload < data.enemy.fireRate:
             data.enemyReload += 1
+        
+        # fire at your ship
         x0,y0 = data.ship.x, data.ship.y
         x1,y1 = data.enemy.x, data.enemy.y
         if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= data.enemy.firingDis:
@@ -441,6 +496,7 @@ def playTimerFired(data):
                 data.enemyBullets.append(data.enemy.makeBullet(data))
                 data.enemyReload = 0
         
+        # fire at asteroids
         if data.enemy.name != "Wraith":
             for asteroid in data.asteroids:
                 x0, y0 = asteroid.x, asteroid.y
@@ -450,6 +506,7 @@ def playTimerFired(data):
                         data.enemyBullets.append(data.enemy.makeBullet(data))
                         data.enemyReload = 0
         
+        # hit enemy ship
         x0,y0 = data.enemy.x, data.enemy.y
         for bullet in data.bullets:
             x1,y1 = bullet.x, bullet.y
@@ -457,12 +514,33 @@ def playTimerFired(data):
                 data.bullets.remove(bullet)
                 data.enemy.health -= data.ship.dmg
         
+        # ships collision
+        x1,y1 = data.ship.x, data.ship.y
+        if ((math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 100) and \
+            (data.invincibilityTimer == data.ship.invincibilityTimer)):
+                
+            data.invincibilityTimer = 0
+            data.enemy.health -= data.ship.dmg
+            data.ship.hit(data.enemy.dmg)
+        
+        # hit your ship
         x0, y0 = data.ship.x, data.ship.y
         for bullet in data.enemyBullets:
             x1, y1 = bullet.x, bullet.y
             if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 10 + 50:
                 data.enemyBullets.remove(bullet)
                 data.ship.hit(data.enemy.dmg)
+        
+        # hit asteroid
+        x0, y0 = data.enemy.x, data.enemy.y
+        for ast in data.asteroids:
+            x1, y1 = ast.x, ast.y
+            if math.sqrt((x1-x0)**2 + (y1-y0)**2) <= 50 + ast.r:
+                data.enemy.health -= (10 + (data.level-1)*2)
+                try:
+                    data.asteroids.remove(ast)
+                except:
+                    pass
             
         if data.enemy.health <= 0:
             data.boss = False
@@ -513,8 +591,12 @@ def playRedrawAll(canvas, data):
      
     moneyStart = 10 + data.ship.health
     canvas.create_image(moneyStart + 20, 20, image = data.moneyIcon)
-    canvas.create_text(moneyStart + 70, 20, text = "%d credits" % data.money, \
-                                    fill = "white")
+    canvas.create_text(moneyStart + 40, 20, text = "%d credits" % data.money, \
+                        anchor = W, fill = "white")
+    
+    
+    canvas.create_text(data.width - 10, 20, text = "Level: %d" % data.level, \
+                        anchor = E,fill = "white")
     x,y = data.cursor
     canvas.create_image(x,y, image = data.cursorImage)
 
@@ -526,14 +608,70 @@ def helpMousePressed(event, data):
 def helpKeyPressed(event, data):
     if event.keysym.lower() == "b":
         data.mode = "title"
+    elif event.keysym.lower() == "p":
+        data.mode = "play"
     
 def helpTimerFired(data):
-    pass
+    x,y = data.cursor
+    p1 = data.frame.pointables[0].tip_position
+    p5 = data.frame.pointables[4].tip_position
+    disX = p5.x - p1.x
+    
+    if data.boom < data.boomRate:
+        data.boom += 1
+    
+    if ((abs(disX) <= 25) and (data.boom == data.boomRate)):
+        data.boomTexts.append((x,y,0,120))
+        data.boom = 0
+    
+    if len(data.boomTexts) > 7:
+        data.boomTexts.pop(0)
+    
+    for i in range(len(data.boomTexts)):
+        x,y = data.boomTexts[i][0], data.boomTexts[i][1]
+        t = data.boomTexts[i][2]
+        dur = data.boomTexts[i][3]
+        t += 1
+        if t >= dur:
+            data.boomTexts[i] = (-50,-50,0,0)
+        else:
+            data.boomTexts[i] = (x,y,t,dur)
+        
+    
 
 def helpRedrawAll(canvas, data):
-    canvas.create_text(data.width/2., 0, text = "Help Screen", anchor = N, \
+    canvas.create_text(data.width/2., 0, text = "Controls", anchor = N, \
                             font = ("Arial bold", 77), fill = "white")
+    start = 200
+    canvas.create_text(50, start, text = "Cursor is controlled by hand.", \
+                    anchor = W, font = ("Arial", 30), fill = "white")
+    start += 50
+    canvas.create_text(50, start, text = "Fire by pinching thumb and pinky.", \
+                    anchor = W, font = ("Arial", 30), fill = "white")
+    start += 50
+    canvas.create_text(50, start, text = "Destroy asteroids to gain credits.", \
+                    anchor = W, font = ("Arial", 30), fill = "white")
+    start += 50
+    canvas.create_text(50, start, text = "Gather powerups:", \
+                    anchor = W, font = ("Arial", 30), fill = "white")
     
+    start += 50
+    x = 100
+    for img in PowerUp.images:
+        canvas.create_image(x,start, image = PowerUp.images[img])
+        x += 100
+    
+    start += 150
+    canvas.create_text(data.width/2., start, text = "Press 'b' to back", \
+                     font = ("Arial", 30), fill = "white")
+    start += 50
+    canvas.create_text(data.width/2., start, text = "...or 'p' to play!", \
+                     font = ("Arial", 30), fill = "white")
+                    
+    for boom in data.boomTexts:
+        x,y = boom[0],boom[1]
+        canvas.create_text(x,y,text = "BOOM!", fill = "white", \
+                        font = ("Arial", 50))
     x,y = data.cursor
     canvas.create_image(x,y, image = data.cursorImage)
 
@@ -545,10 +683,12 @@ def shopMousePressed(event, data):
     if ((x > cx - 40) and (x < cx + 40) and \
        (y < cy + 20) and (y > cy - 20) and data.money >= data.cost):
            data.money -= data.cost
-           data.cost += random.randint(data.cost, data.cost*data.level)
+           data.cost += random.randint(data.cost, int(data.cost*1.5))
            data.ship.maxhealth += 10
            data.ship.maxshield += 10
-           data.ship.speed += 3
+           data.ship.health = data.ship.maxhealth
+           data.ship.shield = data.ship.maxshield
+           data.ship.speed += 1.12
            data.ship.bulletSpeed += 3
            data.ship.fireRate -= 3
            data.ship.basedmg += 5
@@ -581,8 +721,8 @@ def drawBut(canvas, data, eff):
     x1,y1 = x+40,y+20
         
     canvas.create_rectangle(x0,y0,x1,y1, fill = color)
-    canvas.create_text(x,y, text = "Upgrade", fill = "white", font = \
-                            ("Arial", 18))
+    canvas.create_text(x,y, text = "Upgrade: %d"%data.cost, fill = "white", font = \
+                            ("Arial", 16))
     
 def shopRedrawAll(canvas, data):
     margin = 35

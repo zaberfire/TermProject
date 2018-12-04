@@ -52,6 +52,8 @@ class Ship(object):
             self.shield -= dmg
     
     def update(self):
+        self.hpregen = self.maxhealth/1000.
+        self.shieldregen = self.maxshield/100.
         if ((self.shield < self.maxshield) and (self.health == self.maxhealth)):
             self.shield += self.shieldregen
         
